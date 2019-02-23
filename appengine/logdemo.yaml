@@ -1,0 +1,2 @@
+service: logdemo
+runtime: go111

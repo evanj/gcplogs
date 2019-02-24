@@ -16,7 +16,13 @@ import (
 
 // ProjectEnvVar is the environment variable name for configuring a Google Cloud Project ID.
 const ProjectEnvVar = "GOOGLE_CLOUD_PROJECT"
-const cloudTraceHeader = "X-Cloud-Trace-Context"
+
+// TraceHeader is the HTTP header containing trace IDs on Google Cloud.
+const TraceHeader = "X-Cloud-Trace-Context"
+
+// TraceKey is the log key for trace IDs. See:
+// https://cloud.google.com/logging/docs/agent/configuration#special-fields
+const TraceKey = "logging.googleapis.com/trace"
 
 // DefaultProjectID detects the current Google Cloud project ID, or return the empty string if it
 // fails. This function reads files, makes HTTP requests, and might execute binaries. An
@@ -95,7 +101,7 @@ func (t *Tracer) FromRequest(r *http.Request) string {
 		return ""
 	}
 
-	headerValue := r.Header.Get(cloudTraceHeader)
+	headerValue := r.Header.Get(TraceHeader)
 	slashIndex := strings.IndexByte(headerValue, '/')
 	if slashIndex < 0 {
 		return ""

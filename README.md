@@ -2,6 +2,8 @@
 
 If you write logs in the correct format, Google Cloud's [Stackdriver Logging](https://cloud.google.com/logging/docs/basic-concepts) will understand the timestamps, severity levels, collect structured logs, and report stack traces in the error report. This package contains some code to make this easier, as well as some experiments I used to reverse engineer it. The code is in Go, but the formatting things are mostly language independent.
 
+This also contains `gcpzap`, a wrapper for the zap logging library which configures it so Stackdriver understands the logs.
+
 
 ## Logging tips
 
@@ -163,14 +165,16 @@ created by net/http.(*Server).Serve
 
 I compared the following time formats:
 
-* Unix seconds `.` nanoseconds (e.g. 1550949427.724366000): Using `fmt.Sprintf`, `strconv.Itoa`, and `strconv.AppendBytes`
-* RFC3389 with nanoseconds (e.g. 2019-02-23T14:17:07.724366Z): Using `time.Format`, and a not thread safe cached implementation.
+* Unix seconds dot nanoseconds (e.g. `1550949427.724366000`): Using `fmt.Sprintf`, `strconv.Itoa`, and `strconv.AppendBytes`
+* RFC3389 with nanoseconds (e.g. `2019-02-23T14:17:07.724366Z`): Using `time.Format`, and an unsafe cached implementation.
 
 The results in order of fastest to slowest:
 
-* Unix strconv.Append to []byte instead of string: 71.0 ns/op
-* RFC3389 cached: 93.1 ns/op
-* Unix strconv.Append: 94.4 ns/op
-* Unix strconv.Itoa: 133 ns/op
-* Unix Sprintf: 204 ns/op
-* RFC3389: 260 ns/op
+| Implementation | Time (ns/op) |
+| --- | ---: |
+| Unix strconv.Append to []byte | 71.0 |
+| RFC3389 cached | 93.1 |
+| Unix strconv.Append | 94.4 |
+| Unix strconv.Itoa | 133.0 |
+| Unix Sprintf | 204.0 |
+| RFC3389 | 260.0 |

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -44,30 +43,31 @@ func (s *server) fatalDemo(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-		log.Printf("Defaulting to port %s", port)
+	logger, err := gcpzap.NewProduction()
+	if err != nil {
+		panic(err)
 	}
+	defer logger.Sync()
 
 	projectID := gcplogs.DefaultProjectID()
 	if projectID == "" {
 		fmt.Fprintln(os.Stderr, "Could not find Google Project ID; Set "+gcplogs.ProjectEnvVar)
 		os.Exit(1)
 	}
-	log.Printf("detected projectID:%s", projectID)
 
-	rawLogger, err := gcpzap.NewProduction()
-	if err != nil {
-		panic(err)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
-	defer rawLogger.Sync()
+	listenAddr := ":" + port
 
-	s := &server{gcpzap.Tracer{Tracer: gcplogs.Tracer{ProjectID: projectID}, Logger: rawLogger}}
+	logger.Info("zapdemo starting ...", zap.String("projectID", projectID), zap.String("addr", listenAddr))
+
+	s := &server{gcpzap.Tracer{Tracer: gcplogs.Tracer{ProjectID: projectID}, Logger: logger}}
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/log_demo", s.logDemo)
 	http.HandleFunc("/fatal", s.fatalDemo)
-	err = http.ListenAndServe(":"+port, nil)
+	err = http.ListenAndServe(listenAddr, nil)
 	if err != nil {
 		panic(err)
 	}

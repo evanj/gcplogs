@@ -1,37 +1,12 @@
 package main
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"runtime"
 	"strconv"
 	"testing"
 	"time"
 )
-
-func TestTraceIDFromRequest(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"", ""},
-		{"invalid", ""},
-		{"105445aa7843bc8bf206b120001000/0;o=1", "projects/test_id/traces/105445aa7843bc8bf206b120001000"},
-	}
-
-	tracer := &stackdriverTracer{"test_id"}
-
-	for i, test := range tests {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.Header.Set(cloudTraceHeader, test.input)
-
-		output := tracer.TraceIDFromRequest(req)
-		if output != test.expected {
-			t.Errorf("%d: parseTraceID(%#v)=%#v; expected %#v", i, test.input, output, test.expected)
-		}
-	}
-}
 
 func fixedNanos(nanoseconds int) string {
 	const zeros = "000000000"

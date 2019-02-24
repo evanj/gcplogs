@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 
 	"golang.org/x/oauth2/google"
 )
 
 // ProjectEnvVar is the environment variable name for configuring a Google Cloud Project ID.
 const ProjectEnvVar = "GOOGLE_CLOUD_PROJECT"
+const cloudTraceHeader = "X-Cloud-Trace-Context"
 
 // DefaultProjectID detects the current Google Cloud project ID, or return the empty string if it
 // fails. This function reads files, makes HTTP requests, and might execute binaries. An
@@ -73,4 +76,29 @@ func gcloudConfigProjectID() (string, error) {
 	// out contains the value with a new line
 	projectID := string(bytes.TrimSpace(out))
 	return projectID, nil
+}
+
+// Tracer parses trace IDs in the Stackdriver Trace format. ProjectID must be set to a non-empty
+// string, otherwise it will never produce trace IDs. Use &Tracer{DefaultProjectID()} to attempt
+// auto-detection.
+type Tracer struct {
+	ProjectID string
+}
+
+// FromRequest returns the trace ID from a cloud trace header in an HTTP request, or the empty
+// string if it does not exist. See:
+// https://cloud.google.com/trace/docs/troubleshooting#force-trace
+func (t *Tracer) FromRequest(r *http.Request) string {
+	if t.ProjectID == "" {
+		return ""
+	}
+
+	headerValue := r.Header.Get(cloudTraceHeader)
+	slashIndex := strings.IndexByte(headerValue, '/')
+	if slashIndex < 0 {
+		return ""
+	}
+	traceID := headerValue[:slashIndex]
+
+	return "projects/" + t.ProjectID + "/traces/" + traceID
 }

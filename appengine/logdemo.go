@@ -176,7 +176,7 @@ func main() {
 	}
 	log.Printf("detected projectID:%s", projectID)
 
-	s := &server{gcplogs.Tracer{projectID}}
+	s := &server{gcplogs.Tracer{ProjectID: projectID}}
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/log_demo", s.logDemo)
 	http.HandleFunc("/panic", realPanic)

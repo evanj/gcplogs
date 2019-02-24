@@ -6,6 +6,7 @@ import (
 	"os"
 )
 
+// LogExample is a Google Cloud Function example to test logging and error reporting.
 func LogExample(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain;charset=utf-8")
 	w.Write([]byte("ok path:" + r.URL.Path))

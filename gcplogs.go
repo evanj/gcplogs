@@ -10,6 +10,7 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
+// ProjectEnvVar is the environment variable name for configuring a Google Cloud Project ID.
 const ProjectEnvVar = "GOOGLE_CLOUD_PROJECT"
 
 // DefaultProjectID detects the current Google Cloud project ID, or return the empty string if it

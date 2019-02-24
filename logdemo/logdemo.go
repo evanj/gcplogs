@@ -24,7 +24,6 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(rootHTML))
-	log.Printf("projectID: %s", gcplogs.DefaultProjectID())
 }
 
 // Stackdriver's nested timestamp JSON.
@@ -83,6 +82,7 @@ type server struct {
 
 func (s *server) logDemo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain;charset=utf-8")
+	fmt.Fprintf(w, "detected project ID: %s\n\n", gcplogs.DefaultProjectID())
 	fmt.Fprintf(w, "wrote some log lines to stderr:\n\n")
 
 	output := io.MultiWriter(w, os.Stderr)

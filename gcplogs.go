@@ -1,3 +1,5 @@
+// Package gcplogs helps write logs in the correct format to be correctly parsed by Stackdriver
+// Logging when running on Google Cloud Platform.
 package gcplogs
 
 import (

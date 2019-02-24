@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/evanj/gcplogs"
@@ -48,6 +49,7 @@ type stackdriverLine struct {
 	Time             string        `json:"time,omitempty"`
 	TimestampSeconds int64         `json:"timestampSeconds,omitempty"`
 	TimestampNanos   int           `json:"timestampNanos,omitempty"`
+	ExampleKey       int           `json:"example_key,omitempty"`
 }
 
 func formatUnixWithNanos(t time.Time) string {
@@ -76,6 +78,21 @@ func mustLogLine(w io.Writer, line interface{}) {
 	}
 }
 
+var stringToFloatPattern = regexp.MustCompile(`"(\d+\.\d+)"`)
+
+func mustLogStringToFloat(w io.Writer, line interface{}) {
+	serialized, err := json.Marshal(line)
+	if err != nil {
+		panic(err)
+	}
+	serialized = append(serialized, '\n')
+	serialized = stringToFloatPattern.ReplaceAll(serialized, []byte("$1"))
+	_, err = w.Write(serialized)
+	if err != nil {
+		panic(err)
+	}
+}
+
 type server struct {
 	tracer gcplogs.Tracer
 }
@@ -98,11 +115,16 @@ func (s *server) logDemo(w http.ResponseWriter, r *http.Request) {
 	mustLogLine(output, line)
 
 	line.Severity = "INFO"
-	line.Message = "info with time string (DOES NOT WORK)"
+	line.Message = "info with time unix.nanos string (DOES NOT WORK)"
 	line.Timestamp = nil
 	now = now.Add(2 * time.Millisecond)
 	line.Time = formatUnixWithNanos(now)
 	mustLogLine(output, line)
+
+	line.Message = "info with time unix.nanos float (DOES NOT WORK)"
+	now = now.Add(2 * time.Millisecond)
+	line.Time = formatUnixWithNanos(now)
+	mustLogStringToFloat(output, line)
 
 	line.Severity = "WARNING"
 	line.Message = "warning with timestampNano/timestampSecond (works)"
@@ -124,6 +146,25 @@ func (s *server) logDemo(w http.ResponseWriter, r *http.Request) {
 	altLine := altStackdriverLine{"CRITICAL", "critical with timestamp in RFC3339Nano (DOES NOT WORK)", traceID,
 		now.Format(time.RFC3339Nano)}
 	mustLogLine(output, altLine)
+
+	now = now.Add(2 * time.Millisecond)
+	altLine.Severity = "DEBUG"
+	altLine.Message = "debug with timestamp in unix.nanos string (DOES NOT WORK)"
+	altLine.TimestampString = formatUnixWithNanos(now)
+	mustLogLine(output, altLine)
+
+	altLine.Message = "debug with timestamp in unix.nanos float (DOES NOT WORK)"
+	now = now.Add(2 * time.Millisecond)
+	altLine.TimestampString = formatUnixWithNanos(now)
+	mustLogStringToFloat(output, altLine)
+
+	now = now.Add(2 * time.Millisecond)
+	line.Severity = "INFO"
+	line.Message = "info with example structured key"
+	line.Timestamp = &logTimestamp{now.Unix(), now.Nanosecond()}
+	line.Time = ""
+	line.ExampleKey = 42
+	mustLogLine(output, line)
 
 	// wait long enough that the logged times are in the past
 	time.Sleep(20 * time.Millisecond)

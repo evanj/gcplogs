@@ -1,15 +1,21 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/evanj/gcplogs"
 )
 
 const cloudTraceHeader = "X-Cloud-Trace-Context"
+const googleProjectEnvVar = "GOOGLE_CLOUD_PROJECT"
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -22,24 +28,127 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(rootHTML))
+	log.Printf("projectID: %s", gcplogs.DefaultProjectID())
+}
+
+type stackdriverTracer struct {
+	projectID string
 }
 
 // Returns the trace ID from a cloud trace header, or the empty string if it does not exist. See:
 // https://cloud.google.com/trace/docs/troubleshooting#force-trace
-func parseTraceID(r *http.Request) string {
+func (s *stackdriverTracer) TraceIDFromRequest(r *http.Request) string {
 	headerValue := r.Header.Get(cloudTraceHeader)
 	slashIndex := strings.IndexByte(headerValue, '/')
 	if slashIndex < 0 {
 		return ""
 	}
-	return headerValue[:slashIndex]
+	traceID := headerValue[:slashIndex]
+
+	return "projects/" + s.projectID + "/traces/" + traceID
 }
 
-func logDemo(w http.ResponseWriter, r *http.Request) {
+// Stackdriver's nested timestamp JSON.
+type logTimestamp struct {
+	Seconds int64 `json:"seconds,omitempty"`
+	Nanos   int   `json:"nanos,omitempty"`
+}
+
+// Contains data to be logged so Stackdriver parses it correctly. This is made for experimentation
+// so it contains multiple timestamp types. See:
+// https://cloud.google.com/logging/docs/agent/configuration#special-fields
+// Even though this documents a format with JSON key "time" as a unix seconds "." nanos field,
+// that does not work. Formatting "time" as RFC3389 with nanoseconds does work.
+type stackdriverLine struct {
+	// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogSeverity
+	Severity string `json:"severity,omitempty"`
+	Message  string `json:"message,omitempty"`
+	TraceID  string `json:"logging.googleapis.com/trace,omitempty"`
+	// SpanID is documented but doesn't seem useful for anything?
+	SpanID           string        `json:"logging.googleapis.com/spanId,omitempty"`
+	Timestamp        *logTimestamp `json:"timestamp,omitempty"`
+	Time             string        `json:"time,omitempty"`
+	TimestampSeconds int64         `json:"timestampSeconds,omitempty"`
+	TimestampNanos   int           `json:"timestampNanos,omitempty"`
+}
+
+func formatUnixWithNanos(t time.Time) string {
+	return fmt.Sprintf("%d.%09d", t.Unix(), t.Nanosecond())
+}
+
+// Another version with a different timestamp format
+type altStackdriverLine struct {
+	Severity        string `json:"severity,omitempty"`
+	Message         string `json:"message,omitempty"`
+	TraceID         string `json:"logging.googleapis.com/trace,omitempty"`
+	TimestampString string `json:"timestamp,omitempty"`
+}
+
+const traceKey = "logging.googleapis.com/trace"
+
+func mustLogLine(w io.Writer, line interface{}) {
+	serialized, err := json.Marshal(line)
+	if err != nil {
+		panic(err)
+	}
+	serialized = append(serialized, '\n')
+	_, err = w.Write(serialized)
+	if err != nil {
+		panic(err)
+	}
+}
+
+type server struct {
+	tracer *stackdriverTracer
+}
+
+func (s *server) logDemo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain;charset=utf-8")
 
-	traceID := parseTraceID(r)
+	traceID := s.tracer.TraceIDFromRequest(r)
 
+	fmt.Fprintf(w, "wrote some log lines to stderr:\n\n")
+
+	output := io.MultiWriter(w, os.Stderr)
+	now := time.Now().UTC().Truncate(time.Millisecond).Add(987654)
+	line := &stackdriverLine{
+		Severity:  "DEBUG",
+		Message:   "debug with timestamp struct field (works)",
+		TraceID:   traceID,
+		Timestamp: &logTimestamp{now.Unix(), now.Nanosecond()},
+	}
+	mustLogLine(output, line)
+
+	line.Severity = "INFO"
+	line.Message = "info with time string (DOES NOT WORK)"
+	line.Timestamp = nil
+	now = now.Add(2 * time.Millisecond)
+	line.Time = formatUnixWithNanos(now)
+	mustLogLine(output, line)
+
+	line.Severity = "WARNING"
+	line.Message = "warning with timestampNano/timestampSecond (works)"
+	line.Time = ""
+	now = now.Add(2 * time.Millisecond)
+	line.TimestampSeconds = now.Unix()
+	line.TimestampNanos = now.Nanosecond()
+	mustLogLine(output, line)
+
+	line.Severity = "ERROR"
+	line.Message = "error with time in RFC3339Nano (works)"
+	line.TimestampSeconds = 0
+	line.TimestampNanos = 0
+	now = now.Add(2 * time.Millisecond)
+	line.Time = now.Format(time.RFC3339Nano)
+	mustLogLine(output, line)
+
+	now = now.Add(2 * time.Millisecond)
+	altLine := altStackdriverLine{"CRITICAL", "critical with timestamp in RFC3339Nano (DOES NOT WORK)", traceID,
+		now.Format(time.RFC3339Nano)}
+	mustLogLine(output, altLine)
+
+	// wait long enough that the logged times are in the past
+	time.Sleep(20 * time.Millisecond)
 }
 
 func realPanic(w http.ResponseWriter, r *http.Request) {
@@ -82,8 +191,16 @@ func main() {
 		log.Printf("Defaulting to port %s", port)
 	}
 
+	projectID := gcplogs.DefaultProjectID()
+	if projectID == "" {
+		fmt.Fprintln(os.Stderr, "Could not find Google Project ID; Set "+gcplogs.ProjectEnvVar)
+		os.Exit(1)
+	}
+	log.Printf("detected projectID:%s", projectID)
+
+	s := &server{&stackdriverTracer{projectID}}
 	http.HandleFunc("/", rootHandler)
-	http.HandleFunc("/log_demo", logDemo)
+	http.HandleFunc("/log_demo", s.logDemo)
 	http.HandleFunc("/panic", realPanic)
 	http.HandleFunc("/replay_default_panic", replayDefaultPanic)
 	http.HandleFunc("/replay_http_panic", replayHTTPPanic)
@@ -100,6 +217,7 @@ const rootHTML = `<!DOCTYPE html><html>
 <h1>App Engine Logging Demo</h1>
 <p>This application tests logging errors and messages that should get detected by Google Stackdriver when deployed on App Engine.</p>
 <ul>
+<li><a href="/log_demo">Demo/test of JSON logging formats</a></li>
 <li><a href="/panic">A real panic, caught by the http server</a></li>
 <li><a href="/replay_default_panic">Replay "standard" panic</a></li>
 <li><a href="/replay_http_panic">Replay http server panic</a></li>

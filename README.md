@@ -11,7 +11,7 @@ Google provides a fluentd output plugin that scans for exception patterns to com
 
 This is not about the old "legacy" App Engine, or the App Engine "flexible": One is dead and the other seems useless. The old legacy App Engine used to collect all logs from a single request together. This was incredibly useful. In the new world, you can approximate that by parsing the trace ID from the `X-Cloud-Trace-Context` header. The format is `X-Cloud-Trace-Context: TRACE_ID/SPAN_ID;o=TRACE_TRUE`. You can then include this trace ID in future log lines, and the tool will collapse the messages. For details on the other parts, see the [Stackdriver Trace reference for the X-Cloud-Trace-Context header](https://cloud.google.com/trace/docs/troubleshooting#force-trace). 
 
-
+The tricky part is the trace log is in the format `projects/PROJECT_ID/traces/TRACE_ID`. Not only do you need to parse the trace ID, but you also need to parse the project. The good news is in many cases we can auto-detect the project ID. On App Engine, it is available in the .  
 
 
 To report errors to the error report, you need to write out a record that looks like a panic, either as reported by the default Go panic handler, or by the net/http server handler. You can make some small edits:
@@ -117,3 +117,19 @@ net/http.(*conn).serve(0xc00013a1e0, 0x12eff60, 0xc0000f8200)
 created by net/http.(*Server).Serve
 	/go/src/net/http/server.go:2851 +0x2f5
 ```
+
+# Random bonus: formatting time benchmarks
+
+I compared the following time formats:
+
+* Unix seconds `.` nanoseconds (e.g. 1550949427.724366000): Using `fmt.Sprintf`, `strconv.Itoa`, and `strconv.AppendBytes`
+* RFC3389 with nanoseconds (e.g. 2019-02-23T14:17:07.724366Z): Using `time.Format`, and a not thread safe cached implementation.
+
+The results in order of fastest to slowest:
+
+* Unix strconv.Append to []byte instead of string: 71.0 ns/op
+* RFC3389 cached: 93.1 ns/op
+* Unix strconv.Append: 94.4 ns/op
+* Unix strconv.Itoa: 133 ns/op
+* Unix Sprintf: 204 ns/op
+* RFC3389: 260 ns/op

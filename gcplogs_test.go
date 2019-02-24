@@ -2,6 +2,8 @@ package gcplogs
 
 import (
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -99,3 +101,33 @@ const invalidServiceAccountKey = `{
   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/example%40bigquery-tools.iam.gserviceaccount.com"
 }`
+
+func TestTracerFromRequest(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"", ""},
+		{"invalid", ""},
+		{"105445aa7843bc8bf206b120001000/0;o=1", "projects/test_id/traces/105445aa7843bc8bf206b120001000"},
+	}
+
+	tracer := &Tracer{"test_id"}
+	zeroTracer := &Tracer{}
+
+	for i, test := range tests {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set(cloudTraceHeader, test.input)
+
+		output := tracer.FromRequest(req)
+		if output != test.expected {
+			t.Errorf("%d: FromRequest(%#v)=%#v; expected %#v", i, test.input, output, test.expected)
+		}
+
+		zeroOutput := zeroTracer.FromRequest(req)
+		if zeroOutput != "" {
+			t.Errorf("%d: FromRequest() must return the empty string if ProjectID is not set: %#v",
+				i, zeroOutput)
+		}
+	}
+}

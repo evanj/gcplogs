@@ -8,14 +8,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/evanj/gcplogs"
 )
-
-const cloudTraceHeader = "X-Cloud-Trace-Context"
-const googleProjectEnvVar = "GOOGLE_CLOUD_PROJECT"
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -29,23 +25,6 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte(rootHTML))
 	log.Printf("projectID: %s", gcplogs.DefaultProjectID())
-}
-
-type stackdriverTracer struct {
-	projectID string
-}
-
-// Returns the trace ID from a cloud trace header, or the empty string if it does not exist. See:
-// https://cloud.google.com/trace/docs/troubleshooting#force-trace
-func (s *stackdriverTracer) TraceIDFromRequest(r *http.Request) string {
-	headerValue := r.Header.Get(cloudTraceHeader)
-	slashIndex := strings.IndexByte(headerValue, '/')
-	if slashIndex < 0 {
-		return ""
-	}
-	traceID := headerValue[:slashIndex]
-
-	return "projects/" + s.projectID + "/traces/" + traceID
 }
 
 // Stackdriver's nested timestamp JSON.
@@ -99,18 +78,17 @@ func mustLogLine(w io.Writer, line interface{}) {
 }
 
 type server struct {
-	tracer *stackdriverTracer
+	tracer gcplogs.Tracer
 }
 
 func (s *server) logDemo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain;charset=utf-8")
-
-	traceID := s.tracer.TraceIDFromRequest(r)
-
 	fmt.Fprintf(w, "wrote some log lines to stderr:\n\n")
 
 	output := io.MultiWriter(w, os.Stderr)
 	now := time.Now().UTC().Truncate(time.Millisecond).Add(987654)
+	traceID := s.tracer.FromRequest(r)
+
 	line := &stackdriverLine{
 		Severity:  "DEBUG",
 		Message:   "debug with timestamp struct field (works)",
@@ -198,7 +176,7 @@ func main() {
 	}
 	log.Printf("detected projectID:%s", projectID)
 
-	s := &server{&stackdriverTracer{projectID}}
+	s := &server{gcplogs.Tracer{ProjectID: projectID}}
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/log_demo", s.logDemo)
 	http.HandleFunc("/panic", realPanic)

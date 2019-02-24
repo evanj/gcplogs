@@ -4,7 +4,7 @@ jobs:
     docker:
       # Use LTS node CircleCI image: has node, python2 and python3
       - image: circleci/golang:1.11.4-stretch
-    working_directory: /go/src/github.com/evanj/googlesignin
+    working_directory: /go/src/github.com/evanj/gcplogs
     steps:
       - checkout
       - run:

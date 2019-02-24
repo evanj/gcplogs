@@ -91,8 +91,8 @@ func TestWithTrace(t *testing.T) {
 
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.Header.Set(gcplogs.TraceHeader, "traceid/spanid")
-	tracer := &gcplogs.Tracer{"projectid"}
-	logger := WithTraceCore(rootLogger, tracer, r)
+	tracer := &Tracer{gcplogs.Tracer{ProjectID: "projectid"}, rootLogger}
+	logger := tracer.FromRequest(r)
 	logger.Info("message")
 
 	logString := interceptor.readAll()

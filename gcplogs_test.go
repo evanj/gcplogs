@@ -117,7 +117,7 @@ func TestTracerFromRequest(t *testing.T) {
 
 	for i, test := range tests {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.Header.Set(cloudTraceHeader, test.input)
+		req.Header.Set(TraceHeader, test.input)
 
 		output := tracer.FromRequest(req)
 		if output != test.expected {

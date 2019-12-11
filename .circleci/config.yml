@@ -2,9 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      # Use LTS node CircleCI image: has node, python2 and python3
-      - image: circleci/golang:1.11.4-stretch
-    working_directory: /go/src/github.com/evanj/gcplogs
+      - image: golang:1.13.5-buster
     steps:
       - checkout
       - run:

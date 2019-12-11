@@ -3,15 +3,28 @@
 
 set -euf -o pipefail
 
-# Get dependencies: TODO: Use dep or modules
-go get ./...
+# echo commands
+set -x
 
-go test -race ./...
+# Run tests
+go test -mod=readonly -race ./...
 
 # go test only checks some vet warnings; check all
-go vet ./...
+go vet -mod=readonly ./...
 
-go get -u golang.org/x/lint/golint
+# cd /tmp to not change go.mod/go.sum for golint TODO: Use tools.go:
+# https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
+(cd /tmp && go get golang.org/x/lint/golint)
 golint --set_exit_status ./...
 
 diff -u <(echo -n) <(gofmt -d .)
+
+# require that we use go mod tidy. TODO: there must be an easier way?
+go mod tidy
+CHANGED=$(git status --porcelain)
+if [ -n "${CHANGED}" ]; then
+    echo "ERROR files were changed:" > /dev/stderr
+    echo "$CHANGED" > /dev/stderr
+    exit 10
+fi
+

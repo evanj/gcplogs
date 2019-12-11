@@ -1,0 +1,8 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--target=logdemo', '--tag=gcr.io/$PROJECT_ID/logdemo', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--target=zapdemo', '--tag=gcr.io/$PROJECT_ID/zapdemo', '.']
+images:
+- 'gcr.io/$PROJECT_ID/logdemo'
+- 'gcr.io/$PROJECT_ID/zapdemo'

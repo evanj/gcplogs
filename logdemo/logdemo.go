@@ -181,8 +181,8 @@ func panicPrinter(w http.ResponseWriter, panicMessage string) {
 	w.Write([]byte(panicMessage))
 }
 
-func replayDefaultPanic(w http.ResponseWriter, r *http.Request) {
-	panicPrinter(w, defaultPanic)
+func replayModifiedPanic(w http.ResponseWriter, r *http.Request) {
+	panicPrinter(w, modifiedPanic)
 }
 
 func replayHTTPPanic(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +221,7 @@ func main() {
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/log_demo", s.logDemo)
 	http.HandleFunc("/panic", realPanic)
-	http.HandleFunc("/replay_default_panic", replayDefaultPanic)
+	http.HandleFunc("/replay_modified_panic", replayModifiedPanic)
 	http.HandleFunc("/replay_http_panic", replayHTTPPanic)
 	http.HandleFunc("/write_stderr", writeStderr)
 	err := http.ListenAndServe(":"+port, nil)
@@ -238,14 +238,15 @@ const rootHTML = `<!DOCTYPE html><html>
 <ul>
 <li><a href="/log_demo">Demo/test of JSON logging formats</a></li>
 <li><a href="/panic">A real panic, caught by the http server</a></li>
-<li><a href="/replay_default_panic">Replay "standard" panic</a></li>
+<li><a href="/replay_modified_panic">Replay a modified panic</a></li>
 <li><a href="/replay_http_panic">Replay http server panic</a></li>
 <li><a href="/write_stderr">POST ONLY: Use <code>curl --data 'something' URL</code> to write to stderr</a></li>
 </ul>
 </body></html>
 `
 
-const defaultPanic = `panic: not a real panic (default)
+// Looks very similar to a panic, but not exactly the same
+const modifiedPanic = `panic: not a panic but should be reported to Stackdriver Error Report
 
 goroutine 1 [running]:
 main.panicNormally(...)

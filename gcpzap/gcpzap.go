@@ -17,7 +17,7 @@ func newEncoder(cfg zapcore.EncoderConfig) (zapcore.Encoder, error) {
 
 // NewProductionConfig wraps zap.NewProductionConfig with configuration that works on Google Cloud.
 func NewProductionConfig() zap.Config {
-	// register the encoder: ignore errors
+	// register the encoder: ignore errors; TODO: handle errors?
 	_ = zap.RegisterEncoder(encoderName, newEncoder)
 
 	config := zap.NewProductionConfig()

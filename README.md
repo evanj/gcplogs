@@ -14,16 +14,16 @@ This also contains `gcpzap`, a wrapper for the zap logging library which configu
 
 ## Timestamps
 
-The [Stackdriver documentation about time fields](https://cloud.google.com/logging/docs/agent/configuration#timestamp-processing) is incorrect. It only seems to support the following formats:
+The [Stackdriver documentation about time fields](https://cloud.google.com/logging/docs/agent/configuration#timestamp-processing) used to be incorrect, but has been updated. App Engine, Cloud Functions, Cloud Run and Kubernetes seems to support the following formats:
 
 * `timestamp` as a struct: `"timestamp":{"seconds":1551023890,"nanos":858987654}}`
 * `timestampSeconds` and `timestampNanos`: `"timestampSeconds":1551023890,"timestampNanos":862987654`
 * `time` as a RFC3339/ISO8601 string: `"time":"2019-02-24T15:58:10.864987654Z"}`
 
-Notably, this means time as Unix seconds dot nanoseconds ("SSSS.NNNNNNNNN") does not work, either in a JSON string or a JSON float ([public issue for this](https://issuetracker.google.com/issues/125918756)).
+The documentation used to state it supported time as Unix seconds dot nanoseconds ("SSSS.NNNNNNNNN"). That format did not work, either in a JSON string or a JSON float. The demo still includes these formats to verify that they do not work.
 
 
-## Trace IDs
+## Collapsed Logs and Trace IDs
 
 The Google Cloud HTTP load balancer attaches `X-Cloud-Trace-Context` headers to incoming requests. [The format is `X-Cloud-Trace-Context: TRACE_ID/SPAN_ID;o=TRACE_TRUE`](https://cloud.googler.com/trace/docs/toubleshooting#force-trace). If you include the trace ID in the right format, Stackdriver will parse it. For now, this seems to only useful for querying logs, and for collecting logs together in App Engine (see below).
 
@@ -40,6 +40,7 @@ If you write out a panic, it will get reported in the Stackdriver error reporter
 
 ### Things you cannot remove:
 
+* If writing out to stderr: can't remove the "panic:" leading message. If the stack trace is in a structured log, it seems unnecessary
 * Blank line after panic
 * `goroutine` line
 * Change the goroutine number to a string
@@ -68,9 +69,9 @@ ORDER BY COALESCE(log.timestamp, http.timestamp)
 ```
 
 
-## App Engine (New Version)
+## Cloud Run / App Engine (New Version) Collapsed Logs
 
-This is about the "new" App Engine Standard (Java8, Python3, Go111), not the deprecated "legacy" App Engine or App Engine Flexible. The old legacy App Engine used to collect all logs from a single request together. This was incredibly useful. If you include the trace ID in the correct log format, the log viewer will do this, when you expand the request entry in the combined log:
+In the "new" App Engine Standard (Java8, Python3, Go111), and in Cloud Run: if you include a trace ID in the correct format, the log viewer will collect all logs that came from one HTTP request. It shows you when you expand the HTTP request entry in the combined log:
 
 ![Log viewer screenshot](/appengine-collected-logs.png?raw=true "Log viewer screenshot")
 
@@ -160,6 +161,7 @@ net/http.(*conn).serve(0xc00013a1e0, 0x12eff60, 0xc0000f8200)
 created by net/http.(*Server).Serve
 	/go/src/net/http/server.go:2851 +0x2f5
 ```
+
 
 ## Random bonus: formatting time benchmarks
 

@@ -27,9 +27,8 @@ func encodeLevel(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 }
 
 func encodeTime(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-	// According to the documentation, "time" with unix timestamp should work, but does not:
+	// RFC3339 is relatively compact and works. See documentation:
 	// https://cloud.google.com/logging/docs/agent/configuration#timestamp-processing
-	// RFC3339 does work but is a bit slower
 	// TODO: Implement our crazy caching scheme?
 	enc.AppendString(t.UTC().Format(time.RFC3339Nano))
 }
@@ -47,7 +46,9 @@ var functionNamePattern = regexp.MustCompile(`(?m)^(\S+)$`)
 func (s *encoder) EncodeEntry(ent zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
 	if ent.Stack != "" {
 		// Make the message look like a real panic, so Stackdriver error reporting picks it up.
-		ent.Message = "panic: " + ent.Message + "\n\ngoroutine 1 [running]:\n"
+		// This used to need the string "panic: " at the beginning, but no longer seems to need it!
+		// ent.Message = "panic: " + ent.Message + "\n\ngoroutine 1 [running]:\n"
+		ent.Message = ent.Message + "\n\ngoroutine 1 [running]:\n"
 		// Trial-and-error: On App Engine Standard go111 the () are needed after function calls
 		// zap does not add them, so hack it with a regexp
 		replaced := functionNamePattern.ReplaceAllString(ent.Stack, "$1(...)")

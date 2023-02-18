@@ -7,17 +7,15 @@ set -euf -o pipefail
 set -x
 
 # Run tests
-go test -mod=readonly -race ./...
+go test -count=2 -shuffle=on -race ./...
 
 # go test only checks some vet warnings; check all
-go vet -mod=readonly ./...
+go vet ./...
 
-# cd /tmp to not change go.mod/go.sum for golint TODO: Use tools.go:
-# https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module
-(cd /tmp && go get golang.org/x/lint/golint)
-golint --set_exit_status ./...
+go install honnef.co/go/tools/cmd/staticcheck@latest
+staticcheck --checks=all ./...
 
-diff -u <(echo -n) <(gofmt -d .)
+go fmt ./...
 
 # require that we use go mod tidy. TODO: there must be an easier way?
 go mod tidy
@@ -27,4 +25,3 @@ if [ -n "${CHANGED}" ]; then
     echo "$CHANGED" > /dev/stderr
     exit 10
 fi
-

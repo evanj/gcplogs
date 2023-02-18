@@ -161,11 +161,3 @@ func (s *encoder) OpenNamespace(key string) {
 func (s *encoder) Clone() zapcore.Encoder {
 	return &encoder{s.jsonEncoder.Clone()}
 }
-
-func stackdriverEncodeLevel(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
-	enc.AppendByteString(logLevelSeverity[l-minLevel])
-}
-
-func stackdriverEncodeTime(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-	enc.AppendString(t.Format(time.RFC3339Nano))
-}

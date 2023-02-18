@@ -78,7 +78,7 @@ func gcloudConfigProjectID() (string, error) {
 	cmd := exec.Command("gcloud", "config", "get-value", "core/project")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("Failed to get default project from gcloud: %s",
+		return "", fmt.Errorf("failed to get default project from gcloud: %s",
 			err.Error())
 	}
 	// out contains the value with a new line

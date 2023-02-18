@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -63,8 +62,6 @@ type altStackdriverLine struct {
 	TraceID         string `json:"logging.googleapis.com/trace,omitempty"`
 	TimestampString string `json:"timestamp,omitempty"`
 }
-
-const traceKey = "logging.googleapis.com/trace"
 
 func mustLogLine(w io.Writer, line interface{}) {
 	serialized, err := json.Marshal(line)
@@ -195,7 +192,7 @@ func writeStderr(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := ioutil.ReadAll(r.Body)
+	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		panic(err)
 	}

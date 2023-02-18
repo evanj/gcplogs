@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: golang:1.13.5-buster
+      - image: golang:1.20.1-bullseye
     steps:
       - checkout
       - run:

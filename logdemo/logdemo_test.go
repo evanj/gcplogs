@@ -15,7 +15,6 @@ func fixedNanos(nanoseconds int) string {
 }
 
 func strconvFormat(t time.Time) string {
-	const zeros = "000000000"
 	secondsString := strconv.Itoa(int(t.Unix()))
 	return secondsString + "." + fixedNanos(t.Nanosecond())
 }

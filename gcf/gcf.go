@@ -1,3 +1,4 @@
+// Package gcf is a Google Cloud Function example.
 package gcf
 
 import (

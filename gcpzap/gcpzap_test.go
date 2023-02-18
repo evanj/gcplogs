@@ -1,40 +1,40 @@
 package gcpzap
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
-
-	"github.com/evanj/gcplogs"
-
 	"testing"
 
+	"github.com/evanj/gcplogs"
 	"go.uber.org/zap"
 )
 
 type stderrInterceptor struct {
 	origStderr *os.File
-	tempfile   *os.File
+	tempFile   *os.File
 }
 
-func interceptStderr() *stderrInterceptor {
-	tempfile, err := ioutil.TempFile("", "")
+func interceptStderr(t *testing.T) *stderrInterceptor {
+	tempDir := t.TempDir()
+	f, err := os.CreateTemp(tempDir, "test_stderr")
 	if err != nil {
 		panic(err)
 	}
-	interceptor := &stderrInterceptor{os.Stderr, tempfile}
-	os.Stderr = tempfile
+
+	interceptor := &stderrInterceptor{os.Stderr, f}
+	os.Stderr = f
 	return interceptor
 }
 
 func (s *stderrInterceptor) readAll() string {
-	_, err := s.tempfile.Seek(0, os.SEEK_SET)
+	_, err := s.tempFile.Seek(0, io.SeekStart)
 	if err != nil {
 		panic(err)
 	}
-	b, err := ioutil.ReadAll(s.tempfile)
+	b, err := io.ReadAll(s.tempFile)
 	if err != nil {
 		panic(err)
 	}
@@ -43,11 +43,11 @@ func (s *stderrInterceptor) readAll() string {
 
 func (s *stderrInterceptor) Close() {
 	os.Stderr = s.origStderr
-	err := s.tempfile.Close()
+	err := s.tempFile.Close()
 	if err != nil {
 		panic(err)
 	}
-	err = os.Remove(s.tempfile.Name())
+	err = os.Remove(s.tempFile.Name())
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func (s *stderrInterceptor) Close() {
 
 func TestNewProduction(t *testing.T) {
 	// replace stderr with a temporary file
-	interceptor := interceptStderr()
+	interceptor := interceptStderr(t)
 	defer interceptor.Close()
 
 	// calling NewProduction twice must succeed (ignoring duplicate errors)
@@ -81,7 +81,7 @@ func TestNewProduction(t *testing.T) {
 
 func TestWithTrace(t *testing.T) {
 	// replace stderr with a temporary file
-	interceptor := interceptStderr()
+	interceptor := interceptStderr(t)
 	defer interceptor.Close()
 
 	rootLogger, err := NewProduction()

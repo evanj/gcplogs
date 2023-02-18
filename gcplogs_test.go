@@ -1,7 +1,6 @@
 package gcplogs
 
 import (
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,11 +10,7 @@ import (
 
 func TestDefaultProjectID(t *testing.T) {
 	// create a sandbox directory and sanitize the environment
-	tempdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempdir)
+	tempDir := t.TempDir()
 
 	// save the state of special environment variables and remove them so the test works
 	specialEnvVars := []string{ProjectEnvVar, "GOOGLE_APPLICATION_CREDENTIALS", "PATH"}
@@ -29,7 +24,7 @@ func TestDefaultProjectID(t *testing.T) {
 			os.Setenv(key, value)
 		}
 	}()
-	os.Setenv("PATH", tempdir)
+	os.Setenv("PATH", tempDir)
 
 	projectID := DefaultProjectID()
 	if projectID != "" {
@@ -37,8 +32,8 @@ func TestDefaultProjectID(t *testing.T) {
 	}
 
 	// point this to application default credentials
-	keyPath := filepath.Join(tempdir, "key.json")
-	err = ioutil.WriteFile(keyPath, []byte(invalidServiceAccountKey), 0600)
+	keyPath := filepath.Join(tempDir, "key.json")
+	err := os.WriteFile(keyPath, []byte(invalidServiceAccountKey), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,8 +58,8 @@ func TestDefaultProjectID(t *testing.T) {
 	}
 
 	// set up a fake gcloud
-	gcloudPath := filepath.Join(tempdir, "gcloud")
-	err = ioutil.WriteFile(gcloudPath, []byte(fakeGcloud), 0700)
+	gcloudPath := filepath.Join(tempDir, "gcloud")
+	err = os.WriteFile(gcloudPath, []byte(fakeGcloud), 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +69,7 @@ func TestDefaultProjectID(t *testing.T) {
 	if projectID != "gcloud-project-id" {
 		t.Error("incorrect gcloud project:", projectID)
 	}
-	args, err := ioutil.ReadFile(gcloudPath + ".args")
+	args, err := os.ReadFile(gcloudPath + ".args")
 	if err != nil {
 		t.Fatal(err)
 	}
